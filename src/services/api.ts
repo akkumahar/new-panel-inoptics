@@ -85,13 +85,41 @@ export interface RawBrand {
   description?: string;
 }
 
+export interface RawEmailMaster {
+  id: string;
+  email_name?: string;
+  content?: string;
+  applied_place?: string | string[];
+  set_from_email?: string;
+  attach_pdf?: string;
+  admin_copy_email?: string;
+}
+
+export interface RawContractorReq {
+  id: string;
+  company_name?: string;
+  name?: string;
+  email?: string;
+  address?: string;
+  state?: string;
+  city?: string;
+  pincode?: string;
+  phone_numbers?: string;
+  mobile_numbers?: string;
+}
+
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}/${endpoint}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
+    headers: { ...options?.headers },
   });
   if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`);
-  return res.json();
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`Invalid JSON from ${endpoint}: ${text.slice(0, 100)}`);
+  }
 }
 
 function formRequest<T>(endpoint: string, data: Record<string, unknown>): Promise<T> {
@@ -211,6 +239,9 @@ export const brandApi = {
 export const paymentApi = {
   addExhibitor: (data: Record<string, unknown>) => formRequest('add_exhibitor_payment.php', data),
   deleteExhibitor: (id: string) => formRequest('delete_exhibitor_payment.php', { id }),
+  addStallPayment: (data: Record<string, unknown>) => formRequest('add_stall_payment.php', data),
+  deleteStallPayment: (id: string) => formRequest('delete_stall_payment.php', { id }),
+  sendPaymentMail: (data: Record<string, unknown>) => formRequest('send_payment_email.php', data),
   addRegistrationFees: (data: Record<string, unknown>) => formRequest('add_registration_fees.php', data),
   deleteRegistrationFees: (id: string) => formRequest('delete_registration_fees.php', { id }),
   addTaxes: (data: Record<string, unknown>) => formRequest('add_taxes.php', data),
@@ -255,6 +286,8 @@ export const communicationApi = {
   deleteWhatsappInstruction: (id: string) => formRequest('delete_whatsapp_instruction.php', { id }),
   createMessageRule: (data: Record<string, unknown>) => formRequest('create_message_rule.php', data),
   deleteMessageRule: (id: string) => formRequest('delete_message_rule.php', { id }),
+  updateEmail: (data: Record<string, unknown>) => formRequest('update_email_message.php', data),
+  sendBulkEmail: (data: Record<string, unknown>) => formRequest('send_bulk_email.php', data),
 };
 
 // ─── Schedule / Instructions ───────────────────────────────────────────────
@@ -296,6 +329,76 @@ export const websiteApi = {
 };
 
 // ─── GET / Fetch endpoints ─────────────────────────────────────────────────
+// Payment summary raw types — actual field names from fetch_all_payments.php
+export interface RawPaymentSummary {
+  company_name: string;
+  state?: string;
+  // Totals
+  stall_total: number | string;
+  power_total: number | string;
+  badges_total: number | string;
+  total: number | string;
+  pending: number | string;
+  paid_total: number | string;
+  // Paid amounts
+  paid_exhibitor: number | string;
+  paid_power: number | string;
+  paid_badge: number | string;
+  // TDS
+  stall_tds_total: number | string;
+  power_tds_total: number | string;
+  badge_tds_total: number | string;
+  total_tds: number | string;
+  // Payment counts (string summary)
+  stall_payments?: string;
+  power_payments?: string;
+  badge_payments?: string;
+}
+
+export interface RawStallCalculation {
+  total: number | string;
+  discounted_amount: number | string;
+  discount_percent: number | string;
+  sgst_9_percent: number | string;
+  cgst_9_percent: number | string;
+  igst_18_percent: number | string;
+  grand_total: number | string;
+}
+
+export interface RawPaymentRecord {
+  id?: string;
+  amount_paid: number | string;
+  tds: number | string;
+  payment_date?: string;
+  exhibitor_bank?: string;
+  receiver_bank?: string;
+  payment_type?: string;
+}
+
+export interface RawSmsMessage {
+  id: string;
+  sms_name?: string;
+  sms_text?: string;
+  applied_place?: string;
+}
+
+export interface RawPowerPaymentDetails {
+  setup_days: number | string;
+  exhibition_days: number | string;
+  power_payments?: RawPaymentRecord[];
+}
+
+export interface RawBadgePaymentDetails {
+  extra_badges: number | string;
+  badge_payments?: RawPaymentRecord[];
+}
+
+export interface RawStallDetail {
+  stall_number: string;
+  stall_category: string;
+  stall_area: number | string;
+}
+
 export const getApi = {
   exhibitors: () => request<RawExhibitor[]>('get_exhibitors.php'),
   stallsByCompany: (name: string) =>
@@ -312,4 +415,35 @@ export const getApi = {
     request<RawPayment[]>(`get_exhibitor_payment.php?company_name=${encodeURIComponent(name)}`),
   brandsByCompany: (name: string) =>
     request<RawBrand[]>(`get_exhibitor_brands.php?company_name=${encodeURIComponent(name)}`),
+
+  // Communication — API returns { data: [...] }
+  emailMasters: () =>
+    request<{ data?: RawEmailMaster[] } | RawEmailMaster[]>('get_email_messages.php').then((r) =>
+      Array.isArray(r) ? r : ((r as { data?: RawEmailMaster[] }).data ?? [])
+    ),
+  contractorRequirements: () => request<RawContractorReq[]>('get_contractor_requirements.php'),
+  powerVendors: () => request<Record<string, string>[]>('get_power_vendors.php'),
+  furnitureVendors: () => request<Record<string, string>[]>('get_furniture_vendors.php'),
+
+  // SMS — may return { data: [...] } or plain array
+  smsMessages: () =>
+    request<{ data?: RawSmsMessage[] } | RawSmsMessage[]>('get_sms_table.php').then((r) =>
+      Array.isArray(r) ? r : ((r as { data?: RawSmsMessage[] }).data ?? [])
+    ),
+
+  // Payments summary — API returns { success: true, records: [...] }
+  paymentsSummary: () =>
+    request<{ success: boolean; records?: RawPaymentSummary[] }>('fetch_all_payments.php').then(
+      (r) => r.records ?? []
+    ),
+  stallCalculation: (name: string) =>
+    request<RawStallCalculation>(`get_stall_calculation.php?company_name=${encodeURIComponent(name)}`),
+  stallDetails: (name: string) =>
+    request<RawStallDetail[]>(`get_stall_details.php?company_name=${encodeURIComponent(name)}`),
+  stallPayments: (name: string) =>
+    request<RawPaymentRecord[]>(`get_stall_payments.php?company_name=${encodeURIComponent(name)}`),
+  powerPaymentDetails: (name: string) =>
+    request<RawPowerPaymentDetails>(`get_power_payment_details.php?company_name=${encodeURIComponent(name)}`),
+  badgePaymentDetails: (name: string) =>
+    request<RawBadgePaymentDetails>(`get_badge_payment_details.php?company_name=${encodeURIComponent(name)}`),
 };

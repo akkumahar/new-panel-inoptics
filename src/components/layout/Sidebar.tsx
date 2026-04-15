@@ -33,6 +33,10 @@ import {
   ChevronRight,
   Menu,
   X,
+  Mail,
+  Send,
+  Smartphone,
+  Zap,
 } from 'lucide-react';
 import LogoutModal from '@/components/ui/LogoutModal';
 
@@ -59,7 +63,18 @@ const navItems: NavItem[] = [
   { id: 'mandatory-forms', label: 'Exhibitor Mandotary Forms', icon: <FileText size={16} />, href: '/exhibitors/mandatory-forms' },
   { id: 'unlock-contractor', label: 'Unlock Contractor', icon: <Unlock size={16} />, href: '/exhibitors/unlock-contractor' },
   { id: 'payments', label: 'Payments', icon: <CreditCard size={16} />, href: '/payments' },
-  { id: 'communication', label: 'Communication', icon: <MessageCircle size={16} />, href: '/communication' },
+  {
+    id: 'communication',
+    label: 'Communication',
+    icon: <MessageCircle size={16} />,
+    children: [
+      { id: 'comm-emails',    label: 'Emails Master',    icon: <Mail size={14} />,       href: '/communication' },
+      { id: 'comm-bulk',      label: 'Send Bulk Emails', icon: <Send size={14} />,       href: '/communication' },
+      { id: 'comm-sms',       label: 'SMS',              icon: <Smartphone size={14} />, href: '/communication' },
+      { id: 'comm-power',     label: 'Power Vendor',     icon: <Zap size={14} />,        href: '/communication' },
+      { id: 'comm-furniture', label: 'Furniture Vendor', icon: <Armchair size={14} />,   href: '/communication' },
+    ],
+  },
   { id: 'stalls-management', label: 'Stalls-Management', icon: <LayoutGrid size={16} />, href: '/stalls-management' },
   { id: 'forms', label: 'Forms', icon: <ClipboardList size={16} />, href: '/forms' },
   { id: 'masters', label: 'Masters', icon: <Database size={16} />, href: '/masters' },

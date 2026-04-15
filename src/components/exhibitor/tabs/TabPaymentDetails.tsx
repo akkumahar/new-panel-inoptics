@@ -1,14 +1,42 @@
 'use client';
 
 import { useStore } from '@/store';
-import { useState } from 'react';
+import type { ExhibitorPayment } from '@/store';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2, X, CreditCard, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
+import { getApi } from '@/services/api';
 
 export default function TabPaymentDetails() {
-  const { selectedExhibitor, paymentsByExhibitor, addPayment, deletePayment } = useStore();
+  const { selectedExhibitor, paymentsByExhibitor, setPayments, addPayment, deletePayment } = useStore();
   const id = selectedExhibitor!.id;
+  const companyName = selectedExhibitor!.companyName;
   const items = paymentsByExhibitor[id] || [];
   const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const raw = await getApi.paymentsByCompany(companyName);
+        const mapped: ExhibitorPayment[] = raw.map((r) => {
+          const amount = Number(r.amount) || 0;
+          const tax    = Number(r.tax) || 0;
+          return {
+            id: r.id,
+            exhibitorId: id,
+            description: r.description || '',
+            amount,
+            tax,
+            total: Number(r.total) || amount + tax,
+            method: r.payment_method || '',
+            status: (r.status === 'paid' || r.status === 'failed' ? r.status : 'pending') as 'paid' | 'pending' | 'failed',
+            date: r.payment_date || '',
+          };
+        });
+        setPayments(id, mapped);
+      } catch { /* keep existing */ }
+    }
+    load();
+  }, [id, companyName, setPayments]);
   const [form, setForm] = useState({ description: '', amount: '', tax: '', method: 'NEFT', status: 'pending' });
 
   const totalPaid = items.filter(p => p.status === 'paid').reduce((s, p) => s + p.total, 0);
@@ -117,7 +145,7 @@ export default function TabPaymentDetails() {
               {items.map((p, i) => (
                 <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-3 py-3 text-xs text-gray-500">{i + 1}</td>
-                  <td className="px-3 py-3 text-sm font-medium text-gray-800 max-w-[160px] truncate">{p.description}</td>
+                  <td className="px-3 py-3 text-sm font-medium text-gray-800 max-w-40 truncate">{p.description}</td>
                   <td className="px-3 py-3 text-sm text-gray-600 whitespace-nowrap">₹{p.amount.toLocaleString()}</td>
                   <td className="px-3 py-3 text-sm text-gray-600 whitespace-nowrap">₹{p.tax.toLocaleString()}</td>
                   <td className="px-3 py-3 whitespace-nowrap"><span className="text-sm font-semibold text-gray-900">₹{p.total.toLocaleString()}</span></td>

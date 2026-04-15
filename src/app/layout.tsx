@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "InOptics Admin Panel",
-  description: "InOptics Exhibition Management System",
+  title: "InOptics - India’s #1 Exhibition on Optics",
+  description: "InOptics - India’s #1 Exhibition on Optics",
 };
 
 export default function RootLayout({

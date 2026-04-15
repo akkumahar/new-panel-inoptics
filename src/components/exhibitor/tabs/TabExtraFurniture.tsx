@@ -1,14 +1,39 @@
 'use client';
 
 import { useStore } from '@/store';
-import { useState } from 'react';
+import type { FurnitureRequirement } from '@/store';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2, X, Armchair } from 'lucide-react';
+import { getApi } from '@/services/api';
 
 export default function TabExtraFurniture() {
-  const { selectedExhibitor, furnitureByExhibitor, addFurniture, deleteFurniture } = useStore();
+  const { selectedExhibitor, furnitureByExhibitor, setFurniture, addFurniture, deleteFurniture } = useStore();
   const id = selectedExhibitor!.id;
+  const companyName = selectedExhibitor!.companyName;
   const items = furnitureByExhibitor[id] || [];
   const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const raw = await getApi.furnitureByCompany(companyName);
+        const mapped: FurnitureRequirement[] = raw.map((r) => {
+          const qty  = Number(r.quantity) || 0;
+          const rate = Number(r.rate) || 0;
+          return {
+            id: r.id,
+            exhibitorId: id,
+            item: r.item_name || '',
+            quantity: qty,
+            rate,
+            total: Number(r.total) || qty * rate,
+          };
+        });
+        setFurniture(id, mapped);
+      } catch { /* keep existing */ }
+    }
+    load();
+  }, [id, companyName, setFurniture]);
   const [form, setForm] = useState({ item: '', quantity: '', rate: '' });
 
   const grandTotal = items.reduce((s, i) => s + i.total, 0);

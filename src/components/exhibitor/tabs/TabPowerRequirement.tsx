@@ -1,14 +1,35 @@
 'use client';
 
 import { useStore } from '@/store';
-import { useState } from 'react';
+import type { PowerRequirement } from '@/store';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2, X, Zap } from 'lucide-react';
+import { getApi } from '@/services/api';
 
 export default function TabPowerRequirement() {
-  const { selectedExhibitor, powerByExhibitor, addPower, deletePower } = useStore();
+  const { selectedExhibitor, powerByExhibitor, setPower, addPower, deletePower } = useStore();
   const id = selectedExhibitor!.id;
+  const companyName = selectedExhibitor!.companyName;
   const items = powerByExhibitor[id] || [];
   const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const raw = await getApi.powerByCompany(companyName);
+        const mapped: PowerRequirement[] = raw.map((r) => ({
+          id: r.id,
+          exhibitorId: id,
+          component: r.component_name || '',
+          quantity: Number(r.quantity) || 0,
+          wattage: Number(r.wattage) || 0,
+          totalLoad: Number(r.total_load) || (Number(r.quantity) * Number(r.wattage)),
+        }));
+        setPower(id, mapped);
+      } catch { /* keep existing */ }
+    }
+    load();
+  }, [id, companyName, setPower]);
   const [form, setForm] = useState({ component: '', quantity: '', wattage: '' });
 
   const totalLoad = items.reduce((s, i) => s + i.totalLoad, 0);

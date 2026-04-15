@@ -1,14 +1,36 @@
 'use client';
 
 import { useStore } from '@/store';
-import { useState } from 'react';
+import type { AppointedContractor } from '@/store';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2, X, CheckCircle, HardHat } from 'lucide-react';
+import { getApi } from '@/services/api';
 
 export default function TabAppointedContractor() {
-  const { selectedExhibitor, contractorsByExhibitor, addContractor, approveContractor, deleteContractor } = useStore();
+  const { selectedExhibitor, contractorsByExhibitor, setContractors, addContractor, approveContractor, deleteContractor } = useStore();
   const id = selectedExhibitor!.id;
+  const companyName = selectedExhibitor!.companyName;
   const items = contractorsByExhibitor[id] || [];
   const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const raw = await getApi.contractorsByCompany(companyName);
+        const mapped: AppointedContractor[] = raw.map((r) => ({
+          id: r.id,
+          exhibitorId: id,
+          contractorName: r.contractor_name || '',
+          company: r.company || '',
+          phone: r.phone || '',
+          type: r.type || '',
+          status: (r.status === 'approved' || r.status === 'rejected' ? r.status : 'pending') as 'approved' | 'pending' | 'rejected',
+        }));
+        setContractors(id, mapped);
+      } catch { /* keep existing */ }
+    }
+    load();
+  }, [id, companyName, setContractors]);
   const [form, setForm] = useState({ contractorName: '', company: '', phone: '', type: '' });
 
   const handleAdd = () => {

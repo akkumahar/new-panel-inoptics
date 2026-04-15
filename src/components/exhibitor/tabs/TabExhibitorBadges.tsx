@@ -1,14 +1,35 @@
 'use client';
 
 import { useStore } from '@/store';
-import { useState } from 'react';
+import type { ExhibitorBadge } from '@/store';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2, X, Medal, CheckCircle, Clock } from 'lucide-react';
+import { getApi } from '@/services/api';
 
 export default function TabExhibitorBadges() {
-  const { selectedExhibitor, badgesByExhibitor, addBadge, deleteBadge } = useStore();
+  const { selectedExhibitor, badgesByExhibitor, setBadges, addBadge, deleteBadge } = useStore();
   const id = selectedExhibitor!.id;
+  const companyName = selectedExhibitor!.companyName;
   const badges = badgesByExhibitor[id] || [];
   const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const raw = await getApi.badgesByCompany(companyName);
+        const mapped: ExhibitorBadge[] = raw.map((r) => ({
+          id: r.id,
+          exhibitorId: id,
+          badgeNo: r.badge_no || '',
+          name: r.name || '',
+          designation: r.designation || '',
+          consumed: Number(r.consumed) === 1,
+        }));
+        setBadges(id, mapped);
+      } catch { /* keep existing */ }
+    }
+    load();
+  }, [id, companyName, setBadges]);
   const [form, setForm] = useState({ badgeNo: '', name: '', designation: '' });
 
   const consumed = badges.filter((b) => b.consumed).length;

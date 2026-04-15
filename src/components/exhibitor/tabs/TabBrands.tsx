@@ -1,14 +1,34 @@
 'use client';
 
 import { useStore } from '@/store';
-import { useState } from 'react';
+import type { Brand } from '@/store';
+import { useState, useEffect } from 'react';
 import { Plus, Trash2, X, Tag } from 'lucide-react';
+import { getApi } from '@/services/api';
 
 export default function TabBrands() {
-  const { selectedExhibitor, brandsByExhibitor, addBrand, deleteBrand } = useStore();
+  const { selectedExhibitor, brandsByExhibitor, setBrands, addBrand, deleteBrand } = useStore();
   const id = selectedExhibitor!.id;
+  const companyName = selectedExhibitor!.companyName;
   const brands = brandsByExhibitor[id] || [];
   const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const raw = await getApi.brandsByCompany(companyName);
+        const mapped: Brand[] = raw.map((r) => ({
+          id: r.id,
+          exhibitorId: id,
+          brandName: r.brand_name || '',
+          category: r.category || '',
+          description: r.description || '',
+        }));
+        setBrands(id, mapped);
+      } catch { /* keep existing */ }
+    }
+    load();
+  }, [id, companyName, setBrands]);
   const [form, setForm] = useState({ brandName: '', category: '', description: '' });
 
   const handleAdd = () => {
